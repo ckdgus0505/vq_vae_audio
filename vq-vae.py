@@ -502,17 +502,17 @@ class D_Set(Dataset):
 
 
 
-trainset = D_Set(number_of_speakers, receptive_field=receptive_field)
-testset = D_Set(number_of_speakers, receptive_field=receptive_field)
+trainset = D_Set(args.training_data, number_of_speakers, receptive_field=receptive_field)
+testset = D_Set(args.test_data, number_of_speakers, receptive_field=receptive_field)
 
 
-training_loader = DataLoader(args.training_data, dataset = trainset,
+training_loader = DataLoader(dataset = trainset,
                            batch_size=batch_size,
                            shuffle=True, 
                            num_workers=1)
 
 
-validation_loader = DataLoader(args.training_data, dataset = testset,
+validation_loader = DataLoader(dataset = testset,
                            batch_size=batch_size,
                            shuffle=True, 
                            num_workers=1)
