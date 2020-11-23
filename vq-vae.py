@@ -654,15 +654,15 @@ lrs = []
 if (args.load != 0):
     model.load_state_dict(torch.load("model_epoch"+str(args.load)))
 #    optimizer.load_state_dict(torch.load("optim_epoch"+str(args.load)))
-    training_total_loss_per_epochs = np.load('training_total_loss_per_epochs.npy').tolist()
-    training_reconstruction_errors_per_epochs = np.load('training_reconstruction_errors_per_epochs.npy').tolist()
-    validation_total_loss_per_epochs = np.load('validation_total_loss_per_epochs.npy').tolist()
-    validation_reconstruction_errors_per_epochs = np.load('validation_reconstruction_errors_per_epochs.npy').tolist()
+    training_total_loss_per_epochs = np.load('./out/training_total_loss_per_epochs.npy').tolist()
+    training_reconstruction_errors_per_epochs = np.load('./out/training_reconstruction_errors_per_epochs.npy').tolist()
+    validation_total_loss_per_epochs = np.load('./out/validation_total_loss_per_epochs.npy').tolist()
+    validation_reconstruction_errors_per_epochs = np.load('./out/validation_reconstruction_errors_per_epochs.npy').tolist()
     lrs = np.load('lrs.npy')
     
     
 if (args.load_mid != 0 and args.load == 0):
-    model.load_state_dict(torch.load("model_epoch"+str(args.load)))
+    model.load_state_dict(torch.load("./out/model_epoch"+str(args.load)))
 #    optimizer.load_state_dict(torch.load("optim_epoch"+str(args.load)))
 
 
@@ -679,18 +679,18 @@ for i in range(1, epochs+1):
 
     
     if (i % 10 == 0):
-        torch.save(model.state_dict(), "model_epoch"+str(i+args.load))
+        torch.save(model.state_dict(), "./out/model_epoch"+str(i+args.load))
 #        torch.save(optimizer.state_dict(), "optim_epoch"+str(i+args.load))
         
     for param_group in optimizer.param_groups:
         lr = param_group['lr']
         lrs.append(lr)
 
-    np.save('lrs.npy', lrs)
-    np.save('training_total_loss_per_epochs', np.array(training_total_loss_per_epochs))
-    np.save('training_reconstruction_errors_per_epochs', np.array(training_reconstruction_errors_per_epochs))
-    np.save('validation_total_loss_per_epochs', np.array(validation_total_loss_per_epochs))
-    np.save('validation_reconstruction_errors_per_epochs', np.array(validation_reconstruction_errors_per_epochs))
+    np.save('./out/lrs.npy', lrs)
+    np.save('./out/training_total_loss_per_epochs', np.array(training_total_loss_per_epochs))
+    np.save('./out/training_reconstruction_errors_per_epochs', np.array(training_reconstruction_errors_per_epochs))
+    np.save('./out/validation_total_loss_per_epochs', np.array(validation_total_loss_per_epochs))
+    np.save('./out/validation_reconstruction_errors_per_epochs', np.array(validation_reconstruction_errors_per_epochs))
     scheduler.step()
 
 
