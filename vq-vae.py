@@ -1,47 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# # [VQ-VAE](https://arxiv.org/abs/1711.00937) for audio in PyTorch
-# 
-# This notebook is based on 
-# https://github.com/zalandoresearch/pytorch-vq-vae
-# 
-# ## Introduction
-# 
-# Variational Auto Encoders (VAEs) can be thought of as what all but the last layer of a neural network is doing, namely feature extraction or seperating out the data. Thus given some data we can think of using a neural network for representation generation. 
-# 
-# Recall that the goal of a generative model is to estimate the probability distribution of high dimensional data such as images, videos, audio or even text by learning the underlying structure in the data as well as the dependencies between the different elements of the data. This is very useful since we can then use this representation to generate new data with similar properties. This way we can also learn useful features from the data in an unsupervised fashion.
-# 
-# The VQ-VAE uses a discrete latent representation mostly because many important real-world objects are discrete. For example in images we might have categories like "Cat", "Car", etc. and it might not make sense to interpolate between these categories. Discrete representations are also easier to model since each category has a single value whereas if we had a continous latent space then we will need to normalize this density function and learn the dependencies between the different variables which could be very complex.
-# 
-# ### Code
-# 
-# I have followed the code from the TensorFlow implementation by the author which you can find here [vqvae.py](https://github.com/deepmind/sonnet/blob/master/sonnet/python/modules/nets/vqvae.py) and [vqvae_example.ipynb](https://github.com/deepmind/sonnet/blob/master/sonnet/examples/vqvae_example.ipynb). 
-# 
-# Another PyTorch implementation is found at [pytorch-vqvae](https://github.com/ritheshkumar95/pytorch-vqvae).
-# 
-# 
-# ## Basic Idea
-
-# We start by defining a latent embedding space of dimension `[K, D]` where `K` are the number of embeddings and `D` is the dimensionality of each latent embeddng vector $e_i$.
-# 
-# The model will take in batches of waveforms, of size 16126 for our example, and pass it through a ConvNet encoder producing some output, where we make sure the channels are the same as the dimensionality of the latent embedding vectors. To calculate the discrete latent variable we find the nearest embedding vector and output it's index. 
-# 
-# The input to the decoder is the embedding vector corresponding to the index which is passed through the decoder to produce the reconstructed audio. 
-# 
-# Since the nearest neighbour lookup has no real gradient in the backward pass we simply pass the gradients from the decoder to the encoder  unaltered. The intuition is that since the output representation of the encoder and the input to the decoder share the same `D` channel dimensional space, the gradients contain useful information for how the encoder has to change its output to lower the reconstruction loss.
-# 
-# ## Loss
-# 
-# The total loss is composed of three components:
-# 
-# 1. reconstruction loss which optimizes the decoder and encoder
-# 1. due to the fact that gradients bypass the embedding, we use a dictionary learning algorithm  which uses an $l_2$  error to move the embedding vectors $e_i$ towards the encoder output
-# 1. also since the volume of the embedding space is dimensionless, it can grow arbirtarily if the embeddings $e_i$ do not train as fast as  the encoder parameters, and thus we add a commitment loss to make sure that the encoder commits to an embedding
-
-# In[1]:
-
-
 import os
 import subprocess
 
@@ -463,40 +419,6 @@ scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,\
                                               else optimizer.param_groups[0]['lr'])
 
 
-
-'''
-# data = VCTK("/gpfs/gpfs0/a.phan/Vika_voice_conversion/VCTK", receptive_field=receptive_field)
-data = VCTK("./VCTK", receptive_field=receptive_field)
-print(len(data))
-indices = np.arange(len(data))
-test_size = len(data) // 10
-
-train_indices = indices[:-test_size]
-test_indices = indices[-test_size:]
-
-training_loader = DataLoader(data, 
-                       batch_size=1,
-                       shuffle=False, 
-                       num_workers=1,
-                       sampler=SubsetSequentialSampler(train_indices))
-
-validation_loader = DataLoader(data, 
-                       batch_size=1,
-                       shuffle=False, 
-                       num_workers=1,
-                       sampler=SubsetSequentialSampler(test_indices))
-'''
-
-
-# In[ ]:
-
-
-
-
-
-# In[14]:
-
-
 import librosa
 
 
@@ -509,16 +431,16 @@ import librosa
 # In[15]:
 
 
-class TrainingSet(Dataset):
+class D_Set(Dataset):
     # VCTK-Corpus Training data set
 
-    def __init__(self, num_speakers,
+    def __init__(self, data, num_speakers,
                  receptive_field,
                  segment_length=args.length,
                  chunk_size=1000,
                  classes=256):
         
-        self.x_list = self.read_files(args.training_data)
+        self.x_list = self.read_files(data)
         self.classes = 256
         self.segment_length = segment_length
         self.chunk_size = chunk_size
@@ -579,102 +501,18 @@ class TrainingSet(Dataset):
         return mu_x
 
 
-# In[16]:
+
+trainset = D_Set(number_of_speakers, receptive_field=receptive_field)
+testset = D_Set(number_of_speakers, receptive_field=receptive_field)
 
 
-class TestSet(Dataset):
-    # VCTK-Corpus Test data set
-
-
-    def __init__(self, num_speakers,
-                 receptive_field,
-                 segment_length=args.length,
-                 chunk_size=1000,
-                 classes=256):
-        
-        
-        self.x_list = self.read_files(args.test_data)
-        self.classes = 256
-        self.segment_length = segment_length
-        self.chunk_size = chunk_size
-        self.classes = classes
-        self.receptive_field = receptive_field
-        self.cached_pt = 0
-        self.num_speakers = num_speakers
-
-
-    def read_files(self, filename):
-        print("training data from " + args.test_data)
-        with open(filename) as file:
-            files = file.readlines()
-        return [f.strip() for f in files]
-
-    def __getitem__(self, index):
-        try:
-            audio, sr = librosa.load('./VCTK/wav48/'+self.x_list[index])
-        except Exception as e:
-            print(e, audiofile)
-        if sr != 22050:
-            raise ValueError("{} SR of {} not equal to 22050".format(sr, audiofile))
-        
-        audio = librosa.util.normalize(audio) #divide max(abs(audio))
-        audio = self.quantize_data(audio, self.classes)
-            
-        while audio.shape[0] < self.segment_length:
-            index += 1
-            audio, speaker_id = librosa.load('./VCTK/wav48/'+self.x_list[index])
-            
-        max_audio_start = audio.shape[0] - self.segment_length
-        audio_start = random.randint(0, max_audio_start)
-        audio = audio[audio_start:audio_start+self.segment_length]
-        
-                #divide into input and target
-        audio = torch.from_numpy(audio)
-        ohe_audio = torch.FloatTensor(self.classes, self.segment_length).zero_()
-        ohe_audio.scatter_(0, audio.unsqueeze(0), 1.)
-        target = audio[self.receptive_field:]
-            
-        speaker_index = speaker_dic[self.x_list[index].split('/')[0]]
-        speaker_id = torch.from_numpy(np.array(speaker_index)).unsqueeze(0).unsqueeze(0)
-        ohe_speaker = torch.FloatTensor(self.num_speakers, 1).zero_()
-        ohe_speaker.scatter_(0, speaker_id, 1.)
-        
-        return ohe_audio, target, ohe_speaker
-
-    def __len__(self):
-        return len(self.x_list)
-        
-    def quantize_data(self, data, classes):
-        mu_x = self.mu_law_encode(data, classes)
-        bins = np.linspace(-1, 1, classes)
-        quantized = np.digitize(mu_x, bins) - 1
-        return quantized
-
-    def mu_law_encode(self, data, mu):
-        mu_x = np.sign(data) * np.log(1 + mu * np.abs(data)) / np.log(mu + 1)
-        return mu_x
-
-
-# In[ ]:
-
-
-
-
-
-# In[17]:
-
-
-trainset = TrainingSet(number_of_speakers, receptive_field=receptive_field)
-testset = TestSet(number_of_speakers, receptive_field=receptive_field)
-
-
-training_loader = DataLoader(dataset = trainset,
+training_loader = DataLoader(args.training_data, dataset = trainset,
                            batch_size=batch_size,
                            shuffle=True, 
                            num_workers=1)
 
 
-validation_loader = DataLoader(dataset = testset,
+validation_loader = DataLoader(args.training_data, dataset = testset,
                            batch_size=batch_size,
                            shuffle=True, 
                            num_workers=1)
