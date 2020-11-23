@@ -58,7 +58,6 @@ from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
 
 import random
-import fastdtw
 from wavenet_vocoder.wavenet import WaveNet
 from wavenet_vocoder.wavenet import receptive_field_size
 #from vq import VectorQuantizerEMA
